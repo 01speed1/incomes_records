@@ -1,0 +1,71 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model SavingsGoal {
+  id                    String       @id @default(cuid())
+  name                  String
+  description           String?
+  goalType              GoalType     @default(TARGET_BASED)
+  targetAmount          String // Using String to store Decimal values
+  targetDate            DateTime?
+  expectedMonthlyAmount String // Using String to store Decimal values
+  currentBalance        String       @default("0") // Using String to store Decimal values
+  status                GoalStatus   @default(ACTIVE)
+  category              GoalCategory @default(PERSONAL)
+  startDate             DateTime     @default(now()) // Goal start date for retroactive tracking
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  contributions MonthlyContribution[]
+
+  @@map("savings_goals")
+}
+
+model MonthlyContribution {
+  id               String   @id @default(cuid())
+  savingsGoalId    String
+  year             Int
+  month            Int
+  projectedAmount  String // Using String to store Decimal values
+  actualAmount     String? // Using String to store Decimal values
+  variance         String? // Using String to store Decimal values (actual - projected)
+  runningBalance   String // Using String to store Decimal values
+  contributionDate DateTime @default(now())
+  notes            String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  savingsGoal SavingsGoal @relation(fields: [savingsGoalId], references: [id], onDelete: Cascade)
+
+  @@unique([savingsGoalId, year, month])
+  @@map("monthly_contributions")
+}
+
+enum GoalStatus {
+  ACTIVE
+  COMPLETED
+  PAUSED
+  CANCELLED
+}
+
+enum GoalCategory {
+  DEBT_REPAYMENT
+  INVESTMENT
+  PERSONAL
+  EMERGENCY_FUND
+  OTHER
+}
+
+enum GoalType {
+  TARGET_BASED
+  CONTINUOUS
+}
