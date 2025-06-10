@@ -8,6 +8,7 @@ import {
   AnalysisErrorState,
 } from "./AnalysisLoadingState";
 import { RetroactiveAnalyzer } from "../lib/retroactiveAnalyzer";
+import { RetroactiveCalculator } from "../lib/retroactiveCalculator";
 import { CurrencyFormatter } from "../lib/financial";
 import type { SavingsGoalWithContributions } from "../types/financial";
 import type { PerformanceStatus } from "../types/retroactiveAnalysis";
