@@ -26,12 +26,15 @@ type Pages = {
       "goalId": string;
     };
   };
+  "/.well-known/appspecific/com.chrome.devtools.json": {
+    params: {};
+  };
 };
 
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/goals/new" | "/goals/:goalId" | "/goals/:goalId/edit";
+    page: "/" | "/goals/new" | "/goals/:goalId" | "/goals/:goalId/edit" | "/.well-known/appspecific/com.chrome.devtools.json";
   };
   "routes/_index.tsx": {
     id: "routes/_index";
@@ -48,5 +51,9 @@ type RouteFiles = {
   "routes/goals.$goalId.edit.tsx": {
     id: "routes/goals.$goalId.edit";
     page: "/goals/:goalId/edit";
+  };
+  "routes/devtools-silent.tsx": {
+    id: "routes/devtools-silent";
+    page: "/.well-known/appspecific/com.chrome.devtools.json";
   };
 };

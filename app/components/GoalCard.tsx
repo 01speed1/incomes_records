@@ -1,5 +1,6 @@
 import type { SavingsGoalWithContributions } from "../types/financial";
 import { CurrencyFormatter } from "../lib/financial";
+import { RetroactiveAnalysisDisplay } from "./RetroactiveAnalysisDisplay";
 
 interface GoalCardProps {
   goal: SavingsGoalWithContributions;
@@ -97,6 +98,17 @@ export function GoalCard({ goal, onClick }: GoalCardProps) {
             {CurrencyFormatter.formatCompact(goal.targetAmount)}
           </p>
         </div>
+      </div>
+
+      {/* Retroactive Analysis Preview */}
+      <div className="goal-card__retroactive-preview mb-4">
+        <RetroactiveAnalysisDisplay
+          goal={goal}
+          showDetailedMetrics={false}
+          showTimelineStats={false}
+          showExportButton={false}
+          className="goal-card__analysis"
+        />
       </div>
 
       <div className="goal-card__footer flex justify-between items-center">

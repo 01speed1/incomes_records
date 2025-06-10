@@ -61,10 +61,14 @@ export async function action({ request, params }: ActionFunctionArgs) {
 
   if (intent === "update") {
     try {
-      const data = Object.fromEntries(formData);
+      const rawData = Object.fromEntries(formData);
+
+      // Remove intent field before validation since it's not part of goal data
+      const { intent: _, ...data } = rawData;
 
       // Validate form data
       const { error, value } = goalUpdateSchema.validate(data);
+
       if (error) {
         return Response.json(
           {
@@ -104,10 +108,8 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   if (intent === "delete") {
-    console.log("Delete intent received for goal:", goalId);
     try {
       await SavingsGoalService.deleteGoal(goalId);
-      console.log("Goal deleted successfully:", goalId);
       return redirect("/");
     } catch (error) {
       console.error("Error deleting goal:", error);

@@ -1,10 +1,7 @@
 import { prisma } from "../lib/db.server";
-import { FinancialCalculator, ProjectionCalculator } from "../lib/financial";
+import { FinancialCalculator } from "../lib/financial";
 import { Decimal } from "decimal.js";
 import type {
-  SavingsGoalData,
-  MonthlyContributionData,
-  SavingsGoalWithContributions,
   SerializedSavingsGoalWithContributions,
   GoalStatus,
   GoalCategory,
@@ -189,23 +186,50 @@ export class SavingsGoalService {
   }
 
   private static transformGoalData(
-    goal: any
+    goal: {
+      id: string;
+      name: string;
+      description: string | null;
+      goalType: GoalType;
+      targetAmount: string;
+      targetDate: Date | null;
+      expectedMonthlyAmount: string;
+      currentBalance: string | null;
+      status: GoalStatus;
+      category: GoalCategory;
+      startDate: Date | null;
+      createdAt: Date;
+      updatedAt: Date;
+      contributions: Array<{
+        id: string;
+        savingsGoalId: string;
+        year: number;
+        month: number;
+        projectedAmount: string;
+        actualAmount: string | null;
+        variance: string | null;
+        runningBalance: string | null;
+        contributionDate: Date | null;
+        createdAt: Date;
+        updatedAt: Date;
+      }>;
+    }
   ): SerializedSavingsGoalWithContributions {
     return {
       id: goal.id,
       name: goal.name,
-      description: goal.description,
+      description: goal.description || undefined,
       goalType: goal.goalType,
       targetAmount: goal.targetAmount, // Keep as string for JSON serialization
-      targetDate: goal.targetDate,
+      targetDate: goal.targetDate || undefined,
       expectedMonthlyAmount: goal.expectedMonthlyAmount, // Keep as string
       currentBalance: goal.currentBalance || "0", // Keep as string, default to '0'
       status: goal.status,
       category: goal.category,
-      startDate: goal.startDate,
+      startDate: goal.startDate || new Date(), // Provide default date if null
       createdAt: goal.createdAt,
       updatedAt: goal.updatedAt,
-      contributions: goal.contributions.map((contribution: any) => ({
+      contributions: goal.contributions.map((contribution) => ({
         id: contribution.id,
         savingsGoalId: contribution.savingsGoalId,
         year: contribution.year,
@@ -214,8 +238,7 @@ export class SavingsGoalService {
         actualAmount: contribution.actualAmount || undefined,
         variance: contribution.variance || undefined,
         runningBalance: contribution.runningBalance || "0", // Keep as string
-        contributionDate: contribution.contributionDate,
-        notes: contribution.notes,
+        contributionDate: contribution.contributionDate || undefined,
         createdAt: contribution.createdAt,
         updatedAt: contribution.updatedAt,
       })),
@@ -224,21 +247,51 @@ export class SavingsGoalService {
 }
 
 export class ContributionService {
+  static async checkExistingContribution(
+    goalId: string,
+    month: number,
+    year: number
+  ) {
+    return await prisma.monthlyContribution.findUnique({
+      where: {
+        savingsGoalId_year_month: {
+          savingsGoalId: goalId,
+          year: year,
+          month: month,
+        },
+      },
+    });
+  }
+
   static async createContribution(data: {
     goalId: string;
     month: number;
     year: number;
     projectedAmount: string;
     actualAmount?: string;
-    notes?: string;
   }) {
+    // Check if contribution already exists
+    const existing = await this.checkExistingContribution(
+      data.goalId,
+      data.month,
+      data.year
+    );
+
+    if (existing) {
+      const monthName = new Date(0, data.month - 1).toLocaleDateString("en", {
+        month: "long",
+      });
+      throw new Error(
+        `A contribution for ${monthName} ${data.year} already exists. Use updateContribution to modify it.`
+      );
+    }
+
     return this.addContribution({
       savingsGoalId: data.goalId,
       year: data.year,
       month: data.month,
       projectedAmount: data.projectedAmount,
       actualAmount: data.actualAmount,
-      notes: data.notes,
     });
   }
 
@@ -248,8 +301,8 @@ export class ContributionService {
     month: number;
     projectedAmount: string;
     actualAmount?: string;
-    notes?: string;
   }) {
+
     const projectedDecimal = FinancialCalculator.toDecimal(
       data.projectedAmount
     );
@@ -308,7 +361,6 @@ export class ContributionService {
           ? FinancialCalculator.toString(varianceDecimal)
           : null,
         runningBalance: FinancialCalculator.toString(runningBalance),
-        notes: data.notes,
       },
     });
 
@@ -319,46 +371,76 @@ export class ContributionService {
     return contribution;
   }
 
-  static async updateContribution(
-    id: string,
-    data: {
-      actualAmount: string;
-      notes?: string;
-    }
-  ) {
-    const contribution = await prisma.monthlyContribution.findUnique({
-      where: { id },
-    });
-
-    if (!contribution) {
-      throw new Error("Contribution not found");
-    }
-
-    const actualDecimal = FinancialCalculator.toDecimal(data.actualAmount);
-    if (!FinancialCalculator.isZeroOrPositive(actualDecimal)) {
-      throw new Error("Actual amount must be zero or positive");
-    }
-
-    const projectedDecimal = FinancialCalculator.toDecimal(
-      contribution.projectedAmount
+  static async updateContribution(data: {
+    goalId: string;
+    month: number;
+    year: number;
+    projectedAmount?: string;
+    actualAmount?: string;
+  }) {
+    const existing = await this.checkExistingContribution(
+      data.goalId,
+      data.month,
+      data.year
     );
-    const varianceDecimal = FinancialCalculator.subtract(
-      actualDecimal,
-      projectedDecimal
-    );
+
+    if (!existing) {
+      const monthName = new Date(0, data.month - 1).toLocaleDateString("en", {
+        month: "long",
+      });
+      throw new Error(
+        `No contribution found for ${monthName} ${data.year}.`
+      );
+    }
+
+    // Prepare update data
+    const updateData: {
+      projectedAmount?: string;
+      actualAmount?: string;
+      variance?: string;
+      updatedAt?: Date;
+    } = {};
+
+    if (data.projectedAmount !== undefined) {
+      const projectedDecimal = FinancialCalculator.toDecimal(data.projectedAmount);
+      if (!FinancialCalculator.isZeroOrPositive(projectedDecimal)) {
+        throw new Error("Projected amount must be zero or positive");
+      }
+      updateData.projectedAmount = data.projectedAmount;
+    }
+
+    if (data.actualAmount !== undefined) {
+      const actualDecimal = FinancialCalculator.toDecimal(data.actualAmount);
+      if (!FinancialCalculator.isZeroOrPositive(actualDecimal)) {
+        throw new Error("Actual amount must be zero or positive");
+      }
+      updateData.actualAmount = data.actualAmount;
+
+      // Recalculate variance
+      const projectedAmount = data.projectedAmount || existing.projectedAmount;
+      const projectedDecimal = FinancialCalculator.toDecimal(projectedAmount);
+      const varianceDecimal = FinancialCalculator.subtract(actualDecimal, projectedDecimal);
+      updateData.variance = FinancialCalculator.toString(varianceDecimal);
+    }
 
     const updatedContribution = await prisma.monthlyContribution.update({
-      where: { id },
+      where: {
+        savingsGoalId_year_month: {
+          savingsGoalId: data.goalId,
+          year: data.year,
+          month: data.month,
+        },
+      },
       data: {
-        actualAmount: data.actualAmount,
-        variance: FinancialCalculator.toString(varianceDecimal),
-        notes: data.notes,
+        ...updateData,
         updatedAt: new Date(),
       },
     });
 
-    await this.recalculateRunningBalances(contribution.savingsGoalId);
-    await SavingsGoalService.updateCurrentBalance(contribution.savingsGoalId);
+    // Update goal balance if actual amount changed
+    if (data.actualAmount !== undefined) {
+      await SavingsGoalService.updateCurrentBalance(data.goalId);
+    }
 
     return updatedContribution;
   }

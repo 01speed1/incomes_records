@@ -2,6 +2,36 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Custom Animations */
+@layer utilities {
+  .animate-fade-in {
+    animation: fadeIn 0.6s ease-in-out;
+  }
+  
+  .animation-delay-100 {
+    animation-delay: 0.1s;
+  }
+  
+  .animation-delay-200 {
+    animation-delay: 0.2s;
+  }
+  
+  .animation-delay-300 {
+    animation-delay: 0.3s;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 html,
 body {
   @apply bg-white dark:bg-gray-600;
@@ -169,6 +199,57 @@ body {
     
     .responsive-chart__canvas {
       @apply bg-gray-800 border-gray-700;
+    }
+  }
+
+  /* Retroactive Analysis Enhancements */
+  .analysis-export-dropdown__menu {
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  }
+
+  .analysis-export-dropdown__item:hover {
+    background-color: rgba(249, 250, 251, 1);
+  }
+
+  /* Mobile-specific improvements for analysis */
+  @media (max-width: 640px) {
+    .retroactive-analysis-display__header {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 1rem;
+    }
+
+    .analysis-export-dropdown__menu {
+      position: fixed;
+      left: 1rem;
+      right: 1rem;
+      width: auto;
+      margin-top: 0.5rem;
+    }
+
+    .retroactive-metrics__cards {
+      grid-template-columns: 1fr;
+    }
+
+    .retroactive-metrics__stats-grid {
+      grid-template-columns: repeat(2, 1fr);
+    }
+
+    .retroactive-timeline__legend-items {
+      justify-content: center;
+    }
+  }
+
+  /* Touch-friendly improvements */
+  @media (hover: none) and (pointer: coarse) {
+    .analysis-export-btn,
+    .analysis-export-dropdown__item {
+      min-height: 44px;
+      padding: 0.75rem 1rem;
+    }
+
+    .retroactive-metrics__card {
+      padding: 1.25rem;
     }
   }
 }

@@ -9,6 +9,8 @@ import {
   ContributionService,
 } from "../services/savingsGoal.server";
 import { GoalCard } from "../components/GoalCard";
+import { RetroactiveAnalysisDisplay } from "../components/RetroactiveAnalysisDisplay";
+import { ContributionForm } from "../components/ContributionForm";
 import { contributionSchema } from "../schemas/validation";
 import { CurrencyFormatter } from "../lib/financial";
 import * as ClientTransforms from "../lib/client-transforms";
@@ -26,6 +28,7 @@ type LoaderData = {
 type ActionData = {
   success: boolean;
   errors?: Record<string, string>;
+  message?: string;
 };
 
 export const meta: MetaFunction = () => {
@@ -66,12 +69,12 @@ export async function action({ request, params }: ActionFunctionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
 
-  console.log("Action debug - intent:", intent);
-  console.log("Action debug - formData:", Object.fromEntries(formData));
-
   if (intent === "add") {
     try {
-      const data = Object.fromEntries(formData);
+      const rawData = Object.fromEntries(formData);
+
+      // Remove intent field before validation since it's not part of contribution data
+      const { intent: _, ...data } = rawData;
 
       // Validate form data
       const { error, value } = contributionSchema.validate(data);
@@ -102,10 +105,112 @@ export async function action({ request, params }: ActionFunctionArgs) {
       return Response.json({ success: true });
     } catch (error) {
       console.error("Error adding contribution:", error);
+
+      // Handle specific database constraint errors
+      if (error instanceof Error) {
+        // Check for unique constraint violation
+        if (
+          error.message.includes("Unique constraint failed") &&
+          error.message.includes("savingsGoalId") &&
+          error.message.includes("year") &&
+          error.message.includes("month")
+        ) {
+          // Get month/year from the original form data for error message
+          const data = Object.fromEntries(formData);
+          const monthName = new Date(
+            0,
+            Number(data.month) - 1
+          ).toLocaleDateString("en", { month: "long" });
+          return Response.json(
+            {
+              success: false,
+              errors: {
+                general: `A contribution for ${monthName} ${data.year} already exists. Please edit the existing contribution instead.`,
+              },
+            },
+            { status: 409 } // Conflict status code
+          );
+        }
+
+        // Check for custom service error about existing contribution
+        if (error.message.includes("already exists")) {
+          return Response.json(
+            {
+              success: false,
+              errors: { general: error.message },
+            },
+            { status: 409 }
+          );
+        }
+      }
+
       return Response.json(
         {
           success: false,
           errors: { general: "Failed to add contribution. Please try again." },
+        },
+        { status: 500 }
+      );
+    }
+  }
+
+  if (intent === "update") {
+    try {
+      const rawData = Object.fromEntries(formData);
+
+      // Remove intent field before validation since it's not part of contribution data
+      const { intent: _, ...data } = rawData;
+
+      // Validate form data
+      const { error, value } = contributionSchema.validate(data);
+      if (error) {
+        return Response.json(
+          {
+            success: false,
+            errors: error.details.reduce((acc, detail) => {
+              acc[detail.path[0]] = detail.message;
+              return acc;
+            }, {} as Record<string, string>),
+          },
+          { status: 400 }
+        );
+      }
+
+      // Update the contribution
+      await ContributionService.updateContribution({
+        goalId,
+        month: value.month,
+        year: value.year,
+        projectedAmount: value.projectedAmount,
+        actualAmount: value.actualAmount || value.projectedAmount,
+      });
+
+      return Response.json({
+        success: true,
+        message: "Contribution updated successfully!",
+      });
+    } catch (error) {
+      console.error("Error updating contribution:", error);
+
+      if (
+        error instanceof Error &&
+        error.message.includes("No contribution found")
+      ) {
+        return Response.json(
+          {
+            success: false,
+            errors: { general: error.message },
+          },
+          { status: 404 }
+        );
+      }
+
+      return Response.json(
+        {
+          success: false,
+          errors: {
+            general: "Failed to update contribution. Please try again.",
+          },
         },
         { status: 500 }
       );
@@ -233,121 +338,19 @@ export default function GoalDetail() {
           </div>
         </section>
 
+        {/* Retroactive Analysis */}
+        <section className="goal-detail__retroactive-analysis mb-8">
+          <RetroactiveAnalysisDisplay
+            goal={goal}
+            showDetailedMetrics={true}
+            showTimelineStats={true}
+            showExportButton={true}
+          />
+        </section>
+
         {/* Add Contribution Form */}
         <section className="goal-detail__add-contribution mb-8">
-          <div className="goal-detail__add-contribution-card bg-white rounded-lg shadow-md p-6">
-            <h2 className="goal-detail__add-contribution-title text-xl font-semibold text-gray-900 mb-4">
-              Add Monthly Contribution
-            </h2>
-
-            <Form method="post" className="goal-detail__add-contribution-form">
-              <input type="hidden" name="intent" value="add" />
-
-              <div className="goal-detail__form-grid grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div className="goal-detail__form-group">
-                  <label
-                    htmlFor="month"
-                    className="goal-detail__form-label block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Month
-                  </label>
-                  <select
-                    id="month"
-                    name="month"
-                    defaultValue={currentMonth}
-                    className="goal-detail__form-select block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  >
-                    {Array.from({ length: 12 }, (_, i) => (
-                      <option key={i + 1} value={i + 1}>
-                        {new Date(0, i).toLocaleString("default", {
-                          month: "long",
-                        })}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="goal-detail__form-group">
-                  <label
-                    htmlFor="year"
-                    className="goal-detail__form-label block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Year
-                  </label>
-                  <select
-                    id="year"
-                    name="year"
-                    defaultValue={currentYear}
-                    className="goal-detail__form-select block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  >
-                    {Array.from({ length: 5 }, (_, i) => (
-                      <option key={currentYear + i} value={currentYear + i}>
-                        {currentYear + i}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="goal-detail__form-group">
-                  <label
-                    htmlFor="projectedAmount"
-                    className="goal-detail__form-label block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Projected Amount
-                  </label>
-                  <input
-                    type="number"
-                    id="projectedAmount"
-                    name="projectedAmount"
-                    step="0.01"
-                    min="0"
-                    defaultValue={goal.expectedMonthlyAmount.toString()}
-                    className="goal-detail__form-input block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    required
-                  />
-                </div>
-
-                <div className="goal-detail__form-group">
-                  <label
-                    htmlFor="actualAmount"
-                    className="goal-detail__form-label block text-sm font-medium text-gray-700 mb-1"
-                  >
-                    Actual Amount
-                  </label>
-                  <input
-                    type="number"
-                    id="actualAmount"
-                    name="actualAmount"
-                    step="0.01"
-                    min="0"
-                    className="goal-detail__form-input block w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Leave empty if same as projected"
-                  />
-                </div>
-              </div>
-
-              {actionData?.errors && (
-                <div className="goal-detail__form-errors mt-4 p-3 bg-red-50 border border-red-200 rounded-md">
-                  {Object.values(actionData.errors).map((error, index) => (
-                    <p key={index} className="text-sm text-red-600">
-                      {error}
-                    </p>
-                  ))}
-                </div>
-              )}
-
-              <div className="goal-detail__form-actions mt-4">
-                <button
-                  type="submit"
-                  className="goal-detail__form-submit bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition-colors duration-200"
-                >
-                  Add Contribution
-                </button>
-              </div>
-            </Form>
-          </div>
+          <ContributionForm goal={goal} actionData={actionData} />
         </section>
 
         {/* Contributions History */}

@@ -26,22 +26,27 @@ export const savingsGoalSchema = Joi.object({
       "any.only": "Goal type must be either TARGET_BASED or CONTINUOUS",
     }),
 
-  targetAmount: positiveDecimalStringSchema.when('goalType', {
-    is: 'TARGET_BASED',
-    then: Joi.required(),
-    otherwise: Joi.optional()
-  }).messages({
-    "any.required": "Target amount is required for target-based goals",
-  }),
+  targetAmount: positiveDecimalStringSchema
+    .when("goalType", {
+      is: "TARGET_BASED",
+      then: Joi.required(),
+      otherwise: Joi.optional(),
+    })
+    .messages({
+      "any.required": "Target amount is required for target-based goals",
+    }),
 
-  targetDate: Joi.date().min("now").when('goalType', {
-    is: 'TARGET_BASED',
-    then: Joi.optional(),
-    otherwise: Joi.forbidden()
-  }).messages({
-    "date.min": "Target date cannot be in the past",
-    "any.unknown": "Target date is not applicable for continuous goals",
-  }),
+  targetDate: Joi.date()
+    .min("now")
+    .when("goalType", {
+      is: "TARGET_BASED",
+      then: Joi.optional(),
+      otherwise: Joi.forbidden(),
+    })
+    .messages({
+      "date.min": "Target date cannot be in the past",
+      "any.unknown": "Target date is not applicable for continuous goals",
+    }),
 
   expectedMonthlyAmount: positiveDecimalStringSchema.required().messages({
     "any.required": "Expected monthly contribution is required",
@@ -101,6 +106,8 @@ export const monthlyContributionSchema = Joi.object({
 export const goalUpdateSchema = Joi.object({
   name: Joi.string().trim().min(1).max(100).optional(),
 
+  notes: Joi.string().trim().max(1000).optional().allow(""),
+
   description: Joi.string().trim().max(500).optional().allow(""),
 
   targetAmount: positiveDecimalStringSchema.optional(),
@@ -126,6 +133,12 @@ export const goalUpdateSchema = Joi.object({
   startDate: Joi.date().max("now").optional().messages({
     "date.max": "Start date cannot be in the future",
   }),
+  goalType: Joi.string()
+    .valid("TARGET_BASED", "CONTINUOUS")
+    .default("TARGET_BASED")
+    .messages({
+      "any.only": "Goal type must be either TARGET_BASED or CONTINUOUS",
+    }),
 });
 
 export const contributionUpdateSchema = Joi.object({
@@ -176,13 +189,15 @@ export const goalCreateSchema = Joi.object({
       "any.only": "Goal type must be either TARGET_BASED or CONTINUOUS",
     }),
 
-  targetAmount: positiveDecimalStringSchema.when('goalType', {
-    is: 'TARGET_BASED',
-    then: Joi.required(),
-    otherwise: Joi.optional()
-  }).messages({
-    "any.required": "Target amount is required for target-based goals",
-  }),
+  targetAmount: positiveDecimalStringSchema
+    .when("goalType", {
+      is: "TARGET_BASED",
+      then: Joi.required(),
+      otherwise: Joi.optional(),
+    })
+    .messages({
+      "any.required": "Target amount is required for target-based goals",
+    }),
 
   expectedMonthlyAmount: positiveDecimalStringSchema.required().messages({
     "any.required": "Expected monthly contribution is required",
@@ -240,7 +255,8 @@ export const projectionConfigSchema = Joi.object({
     .valid("AVERAGE", "WEIGHTED_RECENT", "FIXED_AMOUNT")
     .default("AVERAGE")
     .messages({
-      "any.only": "Calculation method must be AVERAGE, WEIGHTED_RECENT, or FIXED_AMOUNT",
+      "any.only":
+        "Calculation method must be AVERAGE, WEIGHTED_RECENT, or FIXED_AMOUNT",
     }),
 
   periodMonths: Joi.number().integer().min(1).max(120).default(24).messages({
@@ -256,11 +272,13 @@ export const projectionConfigSchema = Joi.object({
       "any.only": "Chart view must be COMBINED, SEPARATED, or BOTH",
     }),
 
-  fixedAmount: positiveDecimalStringSchema.when('calculationMethod', {
-    is: 'FIXED_AMOUNT',
-    then: Joi.required(),
-    otherwise: Joi.optional()
-  }).messages({
-    "any.required": "Fixed amount is required when using FIXED_AMOUNT method",
-  }),
+  fixedAmount: positiveDecimalStringSchema
+    .when("calculationMethod", {
+      is: "FIXED_AMOUNT",
+      then: Joi.required(),
+      otherwise: Joi.optional(),
+    })
+    .messages({
+      "any.required": "Fixed amount is required when using FIXED_AMOUNT method",
+    }),
 });

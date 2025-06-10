@@ -35,7 +35,6 @@ export default function ChartDemo() {
   });
 
   const handleRetryDemo = () => {
-    console.log("Demo retry clicked");
     setErrorToShow((prev) => ({ ...prev, retryCount: prev.retryCount + 1 }));
   };
 

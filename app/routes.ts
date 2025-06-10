@@ -6,4 +6,9 @@ export default [
   route("goals/new", "routes/goals.new.tsx"),
   route("goals/:goalId", "routes/goals.$goalId.tsx"),
   route("goals/:goalId/edit", "routes/goals.$goalId.edit.tsx"),
+  // Silent route for Chrome DevTools requests
+  route(
+    ".well-known/appspecific/com.chrome.devtools.json",
+    "routes/devtools-silent.tsx"
+  ),
 ] satisfies RouteConfig;

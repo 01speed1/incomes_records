@@ -27,7 +27,6 @@ export interface MonthlyContributionData {
   variance?: Decimal;
   runningBalance: Decimal;
   contributionDate: Date;
-  notes?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -89,7 +88,6 @@ export interface CreateContributionData {
 
 export interface UpdateContributionData {
   actualAmount?: string;
-  notes?: string;
 }
 
 // Types for serialized data (JSON transfer from server to client)
@@ -118,8 +116,7 @@ export interface SerializedMonthlyContributionData {
   actualAmount?: string;
   variance?: string;
   runningBalance: string;
-  contributionDate: Date;
-  notes?: string;
+  contributionDate?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
