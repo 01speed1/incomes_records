@@ -111,16 +111,7 @@ export function GoalCard({ goal, onClick }: GoalCardProps) {
         />
       </div>
 
-      <div className="goal-card__footer flex justify-between items-center">
-        <div className="goal-card__monthly-contribution">
-          <p className="goal-card__monthly-label text-xs text-gray-500">
-            Monthly Goal
-          </p>
-          <p className="goal-card__monthly-value text-sm font-medium text-gray-700">
-            {CurrencyFormatter.format(goal.expectedMonthlyAmount)}
-          </p>
-        </div>
-
+      <div className="goal-card__footer flex justify-end items-center">
         {goal.targetDate && (
           <div className="goal-card__target-date">
             <p className="goal-card__date-label text-xs text-gray-500">

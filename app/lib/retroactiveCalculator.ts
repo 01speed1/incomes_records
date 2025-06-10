@@ -35,6 +35,21 @@ export class RetroactiveCalculator {
   }
 
   /**
+   * Simplified function to calculate theoretical amount for PerformanceIndicator
+   * Uses the same logic as the full analysis but returns just the total amount
+   */
+  static calculateTheoreticalAmountForGoal(
+    goal: { startDate: Date; expectedMonthlyAmount: Decimal },
+    endDate: Date = new Date()
+  ): Decimal {
+    return this.calculateTheoreticalBalance(
+      goal.startDate,
+      goal.expectedMonthlyAmount,
+      endDate
+    );
+  }
+
+  /**
    * Generates theoretical contributions month by month from start to end date
    */
   static generateTheoreticalContributions(

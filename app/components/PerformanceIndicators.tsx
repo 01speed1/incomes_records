@@ -1,4 +1,6 @@
 import type { PerformanceStatus } from "../types/retroactiveAnalysis";
+import type { Decimal } from "decimal.js";
+import { CurrencyFormatter } from "../lib/financial";
 import {
   TrendingUpIcon,
   ArrowRightIcon,
@@ -12,6 +14,8 @@ interface PerformanceIndicatorProps {
   size?: "sm" | "md" | "lg";
   showTooltip?: boolean;
   tooltip?: string;
+  theoreticalAmount?: Decimal;
+  showTheoreticalAmount?: boolean;
 }
 
 export function PerformanceIndicator({
@@ -20,6 +24,8 @@ export function PerformanceIndicator({
   size = "md",
   showTooltip = false,
   tooltip,
+  theoreticalAmount,
+  showTheoreticalAmount = false,
 }: PerformanceIndicatorProps) {
   const getStatusConfig = (status: PerformanceStatus) => {
     switch (status) {
@@ -106,6 +112,21 @@ export function PerformanceIndicator({
       />
     </div>
   );
+
+  // If we should show the theoretical amount, wrap in a container
+  if (showTheoreticalAmount && theoreticalAmount) {
+    return (
+      <div className="performance-indicator-with-amount flex items-center gap-2">
+        {indicator}
+        <div className="theoretical-amount-info">
+          <div className="text-xs text-gray-500 leading-tight">Should have</div>
+          <div className="text-sm font-medium text-gray-700 leading-tight">
+            {CurrencyFormatter.formatCompact(theoreticalAmount)}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return indicator;
 }

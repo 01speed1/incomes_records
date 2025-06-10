@@ -50,6 +50,18 @@ export function RetroactiveAnalysisDisplay({
     }
   }, [goal, hasRetroactiveData]);
 
+  // Calculate theoretical amount that should have been saved by now
+  const theoreticalAmount = useMemo(() => {
+    if (!hasRetroactiveData) return null;
+
+    try {
+      return RetroactiveCalculator.calculateTheoreticalAmountForGoal(goal);
+    } catch (error) {
+      console.error("Error calculating theoretical amount:", error);
+      return null;
+    }
+  }, [goal, hasRetroactiveData]);
+
   // Get overall performance status based on performance percentage
   const getOverallStatus = (percentage: number): PerformanceStatus => {
     if (percentage >= 100) return "ahead";
@@ -109,12 +121,12 @@ export function RetroactiveAnalysisDisplay({
       {/* Quick performance preview - for use in cards or lists */}
       {!showDetailedMetrics && performanceSummary && (
         <div className="retroactive-analysis-display__preview bg-gray-50 rounded-lg p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-1">
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <h4 className="text-sm font-medium text-gray-700 mb-2">
                 Performance Since Start
               </h4>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-3 mb-2">
                 <PerformanceIndicator
                   status={getOverallStatus(
                     performanceSummary.performancePercentage || 0
@@ -128,6 +140,8 @@ export function RetroactiveAnalysisDisplay({
                   )}% of target achieved over ${
                     performanceSummary.periodDescription
                   }`}
+                  theoreticalAmount={theoreticalAmount || undefined}
+                  showTheoreticalAmount={true}
                 />
                 <span className="text-sm text-gray-600">
                   {Math.round(performanceSummary.performancePercentage || 0)}%
@@ -135,7 +149,7 @@ export function RetroactiveAnalysisDisplay({
                 </span>
               </div>
             </div>
-            <div className="text-right">
+            <div className="text-right ml-4">
               <p className="text-lg font-semibold text-gray-900">
                 {CurrencyFormatter.format(goal.currentBalance)}
               </p>

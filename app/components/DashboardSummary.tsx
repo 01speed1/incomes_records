@@ -1,5 +1,6 @@
 import type { SavingsGoalWithContributions } from "../types/financial";
 import { CurrencyFormatter } from "../lib/financial";
+import { RetroactiveCalculator } from "../lib/retroactiveCalculator";
 import { Decimal } from "decimal.js";
 import {
   ChartBarIcon,
@@ -35,6 +36,21 @@ export function DashboardSummary({ goals }: DashboardSummaryProps) {
     (sum, goal) => sum.add(goal.expectedMonthlyAmount),
     new Decimal(0)
   );
+
+  // Calculate total expected amount (theoretical) for all active goals
+  const totalExpectedAmount = activeGoals.reduce((sum, goal) => {
+    try {
+      const theoreticalAmount =
+        RetroactiveCalculator.calculateTheoreticalAmountForGoal(goal);
+      return sum.add(theoreticalAmount);
+    } catch (error) {
+      console.warn(
+        `Error calculating theoretical amount for goal ${goal.id}:`,
+        error
+      );
+      return sum;
+    }
+  }, new Decimal(0));
 
   return (
     <div className="dashboard-summary">
@@ -149,7 +165,7 @@ export function DashboardSummary({ goals }: DashboardSummaryProps) {
         </div>
 
         <div className="dashboard-summary__progress-insights mt-4">
-          <div className="dashboard-summary__insights-grid grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="dashboard-summary__insights-grid grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
             <div className="dashboard-summary__insight">
               <p className="dashboard-summary__insight-label text-xs text-gray-500 uppercase tracking-wide">
                 Remaining Amount
@@ -158,6 +174,24 @@ export function DashboardSummary({ goals }: DashboardSummaryProps) {
                 {CurrencyFormatter.formatCompact(
                   totalTargetAmount.sub(totalCurrentBalance)
                 )}
+              </p>
+            </div>
+
+            <div className="dashboard-summary__insight">
+              <p className="dashboard-summary__insight-label text-xs text-gray-500 uppercase tracking-wide">
+                Expected Total
+              </p>
+              <p className="dashboard-summary__insight-value text-sm font-medium text-blue-600">
+                {CurrencyFormatter.formatCompact(totalExpectedAmount)}
+              </p>
+            </div>
+
+            <div className="dashboard-summary__insight">
+              <p className="dashboard-summary__insight-label text-xs text-gray-500 uppercase tracking-wide">
+                Monthly Commitment
+              </p>
+              <p className="dashboard-summary__insight-value text-sm font-medium text-orange-600">
+                {CurrencyFormatter.formatCompact(monthlyContributionTotal)}/mo
               </p>
             </div>
 
