@@ -1,4 +1,5 @@
 import { prisma } from "../lib/db.server";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { FinancialCalculator } from "../lib/financial";
 import { Decimal } from "decimal.js";
 import type {
@@ -156,8 +157,12 @@ export class SavingsGoalService {
     });
   }
 
-  static async updateCurrentBalance(goalId: string) {
-    const contributions = await prisma.monthlyContribution.findMany({
+  static async updateCurrentBalance(
+    goalId: string,
+    tx?: PrismaClient | Prisma.TransactionClient
+  ) {
+    const client = (tx ?? prisma) as PrismaClient | Prisma.TransactionClient;
+    const contributions = await client.monthlyContribution.findMany({
       where: {
         savingsGoalId: goalId,
         actualAmount: { not: null },
@@ -174,7 +179,7 @@ export class SavingsGoalService {
       }
     }
 
-    await prisma.savingsGoal.update({
+  await client.savingsGoal.update({
       where: { id: goalId },
       data: {
         currentBalance: FinancialCalculator.toString(currentBalance),
@@ -302,7 +307,6 @@ export class ContributionService {
     projectedAmount: string;
     actualAmount?: string;
   }) {
-
     const projectedDecimal = FinancialCalculator.toDecimal(
       data.projectedAmount
     );
@@ -325,48 +329,53 @@ export class ContributionService {
       );
     }
 
-    const previousContributions = await prisma.monthlyContribution.findMany({
-      where: {
-        savingsGoalId: data.savingsGoalId,
-        OR: [
-          { year: { lt: data.year } },
-          { year: data.year, month: { lt: data.month } },
-        ],
-      },
-      orderBy: [{ year: "asc" }, { month: "asc" }],
-    });
+    // Use a transaction to ensure consistency between insert and balance update
+    const [contribution] = await prisma.$transaction(async (tx) => {
+      const previousContributions = await tx.monthlyContribution.findMany({
+        where: {
+          savingsGoalId: data.savingsGoalId,
+          OR: [
+            { year: { lt: data.year } },
+            { year: data.year, month: { lt: data.month } },
+          ],
+        },
+        orderBy: [{ year: "asc" }, { month: "asc" }],
+      });
 
-    let runningBalance = new Decimal(0);
-    for (const contribution of previousContributions) {
-      if (contribution.actualAmount) {
-        runningBalance = FinancialCalculator.add(
-          runningBalance,
-          FinancialCalculator.toDecimal(contribution.actualAmount)
-        );
+      let runningBalance = new Decimal(0);
+      for (const contribution of previousContributions) {
+        if (contribution.actualAmount) {
+          runningBalance = FinancialCalculator.add(
+            runningBalance,
+            FinancialCalculator.toDecimal(contribution.actualAmount)
+          );
+        }
       }
-    }
 
-    if (actualDecimal) {
-      runningBalance = FinancialCalculator.add(runningBalance, actualDecimal);
-    }
+      if (actualDecimal) {
+        runningBalance = FinancialCalculator.add(runningBalance, actualDecimal);
+      }
 
-    const contribution = await prisma.monthlyContribution.create({
-      data: {
-        savingsGoalId: data.savingsGoalId,
-        year: data.year,
-        month: data.month,
-        projectedAmount: data.projectedAmount,
-        actualAmount: data.actualAmount,
-        variance: varianceDecimal
-          ? FinancialCalculator.toString(varianceDecimal)
-          : null,
-        runningBalance: FinancialCalculator.toString(runningBalance),
-      },
+      const created = await tx.monthlyContribution.create({
+        data: {
+          savingsGoalId: data.savingsGoalId,
+          year: data.year,
+          month: data.month,
+          projectedAmount: data.projectedAmount,
+          actualAmount: data.actualAmount,
+          variance: varianceDecimal
+            ? FinancialCalculator.toString(varianceDecimal)
+            : null,
+          runningBalance: FinancialCalculator.toString(runningBalance),
+        },
+      });
+
+      if (actualDecimal) {
+        await SavingsGoalService.updateCurrentBalance(data.savingsGoalId, tx);
+      }
+
+      return [created];
     });
-
-    if (actualDecimal) {
-      await SavingsGoalService.updateCurrentBalance(data.savingsGoalId);
-    }
 
     return contribution;
   }
@@ -423,24 +432,28 @@ export class ContributionService {
       updateData.variance = FinancialCalculator.toString(varianceDecimal);
     }
 
-    const updatedContribution = await prisma.monthlyContribution.update({
-      where: {
-        savingsGoalId_year_month: {
-          savingsGoalId: data.goalId,
-          year: data.year,
-          month: data.month,
+    // Wrap update and potential balance recompute in a transaction
+    const [updatedContribution] = await prisma.$transaction(async (tx) => {
+      const updated = await tx.monthlyContribution.update({
+        where: {
+          savingsGoalId_year_month: {
+            savingsGoalId: data.goalId,
+            year: data.year,
+            month: data.month,
+          },
         },
-      },
-      data: {
-        ...updateData,
-        updatedAt: new Date(),
-      },
-    });
+        data: {
+          ...updateData,
+          updatedAt: new Date(),
+        },
+      });
 
-    // Update goal balance if actual amount changed
-    if (data.actualAmount !== undefined) {
-      await SavingsGoalService.updateCurrentBalance(data.goalId);
-    }
+      if (data.actualAmount !== undefined) {
+        await SavingsGoalService.updateCurrentBalance(data.goalId, tx);
+      }
+
+      return [updated];
+    });
 
     return updatedContribution;
   }

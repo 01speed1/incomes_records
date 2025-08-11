@@ -1,50 +1,46 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider     = "postgresql"
+  url          = env("DATABASE_URL")
+  relationMode = "foreignKeys"
 }
 
 model SavingsGoal {
-  id                    String       @id @default(cuid())
+  id                    String                @id @default(cuid())
   name                  String
   description           String?
-  goalType              GoalType     @default(TARGET_BASED)
-  targetAmount          String // Using String to store Decimal values
+  goalType              GoalType              @default(TARGET_BASED)
+  targetAmount          String
   targetDate            DateTime?
-  expectedMonthlyAmount String // Using String to store Decimal values
-  currentBalance        String       @default("0") // Using String to store Decimal values
-  status                GoalStatus   @default(ACTIVE)
-  category              GoalCategory @default(PERSONAL)
-  startDate             DateTime     @default(now()) // Goal start date for retroactive tracking
-  createdAt             DateTime     @default(now())
-  updatedAt             DateTime     @updatedAt
-
-  contributions MonthlyContribution[]
+  expectedMonthlyAmount String
+  currentBalance        String                @default("0")
+  status                GoalStatus            @default(ACTIVE)
+  category              GoalCategory          @default(PERSONAL)
+  startDate             DateTime              @default(now())
+  createdAt             DateTime              @default(now())
+  updatedAt             DateTime              @updatedAt
+  contributions         MonthlyContribution[]
 
   @@map("savings_goals")
 }
 
 model MonthlyContribution {
-  id               String   @id @default(cuid())
+  id               String      @id @default(cuid())
   savingsGoalId    String
   year             Int
   month            Int
-  projectedAmount  String // Using String to store Decimal values
-  actualAmount     String? // Using String to store Decimal values
-  variance         String? // Using String to store Decimal values (actual - projected)
-  runningBalance   String // Using String to store Decimal values
-  contributionDate DateTime @default(now())
+  projectedAmount  String
+  actualAmount     String?
+  variance         String?
+  runningBalance   String
+  contributionDate DateTime    @default(now())
   notes            String?
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-
-  savingsGoal SavingsGoal @relation(fields: [savingsGoalId], references: [id], onDelete: Cascade)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  savingsGoal      SavingsGoal @relation(fields: [savingsGoalId], references: [id], onDelete: Cascade)
 
   @@unique([savingsGoalId, year, month])
   @@map("monthly_contributions")
